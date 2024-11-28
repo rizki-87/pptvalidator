@@ -228,19 +228,22 @@ def save_to_csv(issues, output_csv):
 def main():
     st.title("PPT Validator")
 
-    # Create session state for uploaded file
+    # Create session state for uploaded file and validation status
     if "uploaded_file" not in st.session_state:
         st.session_state.uploaded_file = None
+        st.session_state.validated = False
 
+    # File uploader
     uploaded_file = st.file_uploader("Upload a PowerPoint file", type=["pptx"])
 
-    # Update session state with uploaded file
+    # Store the uploaded file in session state
     if uploaded_file:
         st.session_state.uploaded_file = uploaded_file
 
     font_options = ["Arial", "Calibri", "Times New Roman", "Verdana", "Helvetica"]
     default_font = st.selectbox("Select the default font for validation", font_options)
 
+    # Run Validation button
     if st.session_state.uploaded_file and st.button("Run Validation"):
         with tempfile.TemporaryDirectory() as tmpdir:
             # Save uploaded file temporarily
@@ -269,19 +272,26 @@ def main():
             # Save to CSV
             save_to_csv(grammar_issues, csv_output_path)
 
-            # Display download link for CSV
+            # Update validation status
+            st.session_state.validated = True
+            st.session_state.csv_path = csv_output_path.read_bytes()
+
+            # Show success message
             st.success("Validation completed!")
-            st.download_button("Download Validation Report (CSV)", csv_output_path.read_bytes(),
+            st.download_button("Download Validation Report (CSV)",
+                               st.session_state.csv_path,
                                file_name="validation_report.csv")
 
     # Reset button functionality
     if st.button("Reset"):
-        # Clear uploaded file and reset session state
+        # Clear session state variables without reloading
         st.session_state.uploaded_file = None
-        st.session_state.clear()
+        st.session_state.validated = False
+        st.session_state.csv_path = None
 
-        # Refresh the app to the initial state
-        st.experimental_rerun()
+        # Clear all widgets
+        st.experimental_set_query_params()
 
 if __name__ == "__main__":
     main()
+
