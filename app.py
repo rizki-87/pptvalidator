@@ -8,7 +8,7 @@ import csv
 import tempfile
 import re
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-from matplotlib import font_manager
+import winreg
 
 # Initialize T5 model for grammar correction
 MODEL_NAME = "vennify/t5-base-grammar-correction"
@@ -23,6 +23,19 @@ def correct_grammar(text):
     outputs = model.generate(input_ids, max_length=512)
     corrected_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
     return corrected_text
+
+# Function to get installed fonts on Windows
+def get_windows_fonts():
+    fonts = []
+    try:
+        registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")
+        for i in range(0, winreg.QueryInfoKey(registry_key)[0]):
+            font_name = winreg.EnumValue(registry_key, i)[0]
+            fonts.append(font_name.split(' (')[0])  # Get only the font name without additional details
+        winreg.CloseKey(registry_key)
+    except Exception as e:
+        st.error(f"Error fetching fonts: {e}")
+    return sorted(set(fonts))
 
 # Function to validate fonts
 def validate_fonts(ppt_path, selected_font, output_ppt_path):
@@ -128,8 +141,8 @@ st.write("This is a Streamlit app for validating PowerPoint presentations.")
 uploaded_file = st.file_uploader("Upload a PowerPoint file", type=["pptx"])
 
 # Font selection widget
-available_fonts = sorted(set(f.name for f in font_manager.fontManager.ttflist))
-default_font = st.selectbox("Select the default font for validation", available_fonts)
+windows_fonts = get_windows_fonts()
+default_font = st.selectbox("Select the default font for validation", windows_fonts)
 
 # Process the file on button click
 if uploaded_file and st.button("Run Validation"):
