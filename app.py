@@ -354,10 +354,11 @@ def main():
             # Run validations
             font_issues = validate_fonts(temp_ppt_path, default_font)
             punctuation_issues = validate_punctuation(temp_ppt_path)
+            grammar_issues = validate_grammar(temp_ppt_path)
             spelling_issues = validate_spelling(temp_ppt_path)
 
             # Combine issues and save to CSV
-            combined_issues = font_issues + punctuation_issues + spelling_issues
+            combined_issues = font_issues + punctuation_issues + grammar_issues + spelling_issues
             save_to_csv(combined_issues, csv_output_path)
 
             # Display success and download link
