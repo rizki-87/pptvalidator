@@ -192,8 +192,9 @@ def check_grammar(text):
         input_text = f"grammar: {text}"
         input_ids = tokenizer.encode(input_text, return_tensors="pt", truncation=True)
         outputs = model.generate(input_ids, max_length=512)
-        corrected_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        corrected_text = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
+        # Only classify as "Grammatical error" if correction changes the structure significantly
         if corrected_text.lower() != text.lower():
             return "Grammatical error", corrected_text
         return "No issues", text
@@ -212,33 +213,16 @@ def validate_grammar(input_ppt):
                 for paragraph in shape.text_frame.paragraphs:
                     for run in paragraph.runs:
                         if run.text.strip():
-                            text = run.text
-
-                            # Detect punctuation issues first
-                            excessive_punctuation_pattern = r"([!?.:,;]{2,})"
-                            match = re.search(excessive_punctuation_pattern, text)
-                            if match:
-                                punctuation_marks = match.group(1)
-                                grammar_issues.append({
-                                    'slide': slide_index,
-                                    'issue': 'Punctuation Marks',
-                                    'text': text,
-                                    'corrected': f"Excessive punctuation marks detected ({punctuation_marks})"
-                                })
-                                continue  # Skip further grammar checking if punctuation issue detected
-
-                            # Check for grammar errors
-                            issue, corrected_text = check_grammar(text)
+                            issue, corrected_text = check_grammar(run.text)
                             if issue == "Grammatical error":
                                 grammar_issues.append({
                                     'slide': slide_index,
-                                    'issue': 'Grammatical error',
-                                    'text': text,
+                                    'issue': issue,
+                                    'text': run.text,
                                     'corrected': corrected_text
                                 })
 
     return grammar_issues
-
 
 
 # Function to detect and correct misspellings
