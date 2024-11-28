@@ -223,8 +223,9 @@ def validate_punctuation(input_ppt):
     punctuation_issues = []
 
     # Define patterns for punctuation problems
-    excessive_punctuation_pattern = r"(?:[!?.:,;]{2,})"  # Two or more punctuation marks
-    repeated_word_pattern = r"\b(\w+)\s+\1\b"  # Repeated words (e.g., "the the")
+    excessive_punctuation_pattern = r"([!?.:,;])\1+"  # Two or more of the same punctuation mark
+    redundant_dots_pattern = r"\.\.+"
+    unnecessary_punctuation_pattern = r",\s*[,.]"  # Example: ",." or ",,"
 
     for slide_index, slide in enumerate(presentation.slides, start=1):
         for shape in slide.shapes:
@@ -233,23 +234,27 @@ def validate_punctuation(input_ppt):
                     for run in paragraph.runs:
                         if run.text.strip():
                             text = run.text
+                            corrected_text = text
 
-                            # Check excessive punctuation
+                            # Correct excessive punctuation
                             if re.search(excessive_punctuation_pattern, text):
-                                punctuation_issues.append({
-                                    'slide': slide_index,
-                                    'issue': 'Punctuation Marks',
-                                    'text': text,
-                                    'corrected': re.sub(excessive_punctuation_pattern, "", text)
-                                })
+                                corrected_text = re.sub(excessive_punctuation_pattern, r"\1", corrected_text)
 
-                            # Check repeated words
-                            if re.search(repeated_word_pattern, text, flags=re.IGNORECASE):
+                            # Correct redundant dots (e.g., "...")
+                            if re.search(redundant_dots_pattern, text):
+                                corrected_text = re.sub(redundant_dots_pattern, ".", corrected_text)
+
+                            # Correct unnecessary punctuation
+                            if re.search(unnecessary_punctuation_pattern, text):
+                                corrected_text = re.sub(unnecessary_punctuation_pattern, ",", corrected_text)
+
+                            # If corrections were made, log the issue
+                            if corrected_text != text:
                                 punctuation_issues.append({
                                     'slide': slide_index,
                                     'issue': 'Punctuation Marks',
                                     'text': text,
-                                    'corrected': re.sub(repeated_word_pattern, r"\1", text, flags=re.IGNORECASE)
+                                    'corrected': corrected_text
                                 })
 
     return punctuation_issues
@@ -309,3 +314,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
