@@ -183,25 +183,38 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
 
 # Function to check grammar and spelling
+# Function to check grammar and spelling with misspelling details
 def check_grammar_and_spelling(text):
     if not text.strip():
-        return "No issues", text  # Return "No issues" for empty text
+        return "No issues", text, []  # Return "No issues" for empty text
     try:
         input_text = f"grammar: {text}"
         input_ids = tokenizer.encode(input_text, return_tensors="pt", truncation=True)
         outputs = model.generate(input_ids, max_length=512)
         corrected_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-        # Classify issue based on comparison
-        if corrected_text.lower() != text.lower():  # Case insensitive comparison
-            if any(word not in corrected_text for word in text.split()):  # Misspelling detected
-                return "Misspelling", corrected_text
-            else:  # Otherwise classify as grammatical error
-                return "Grammatical error", corrected_text
-        return "No issues", text
+        # Check for misspellings by comparing original and corrected words
+        original_words = text.split()
+        corrected_words = corrected_text.split()
+        misspellings = []
+
+        for original, corrected in zip(original_words, corrected_words):
+            if original.lower() != corrected.lower():  # Case insensitive comparison
+                misspellings.append((original, corrected))
+
+        if misspellings:
+            # Format the list of misspellings for clarity
+            suggestions = "; ".join([f"'{orig}' -> '{corr}'" for orig, corr in misspellings])
+            return "Misspelling", corrected_text, suggestions
+
+        if corrected_text.lower() != text.lower():
+            return "Grammatical error", corrected_text, []
+
+        return "No issues", text, []
     except Exception as e:
         st.error(f"Error in grammar/spelling check: {e}")
-        return "Error", text
+        return "Error", text, []
+
 
 # Function to validate fonts in a presentation
 def validate_fonts(input_ppt, default_font):
@@ -264,6 +277,7 @@ def validate_punctuation(input_ppt):
     return punctuation_issues
 
 # Function to validate grammar and spelling in a presentation
+# Function to validate grammar and spelling in a presentation
 def validate_grammar_and_spelling(input_ppt):
     presentation = Presentation(input_ppt)
     grammar_issues = []
@@ -274,16 +288,17 @@ def validate_grammar_and_spelling(input_ppt):
                 for paragraph in shape.text_frame.paragraphs:
                     for run in paragraph.runs:
                         if run.text.strip():
-                            issue, corrected_text = check_grammar_and_spelling(run.text)
+                            issue, corrected_text, suggestions = check_grammar_and_spelling(run.text)
                             if issue != "No issues":
                                 grammar_issues.append({
                                     'slide': slide_index,
                                     'issue': issue,
                                     'text': run.text,
-                                    'corrected': corrected_text
+                                    'corrected': corrected_text if issue == "Grammatical error" else "; ".join(suggestions)
                                 })
 
     return grammar_issues
+
 
 # Function to save issues to CSV
 def save_to_csv(issues, output_csv):
