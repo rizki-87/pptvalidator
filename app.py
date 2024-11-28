@@ -223,8 +223,8 @@ def validate_punctuation(input_ppt):
     punctuation_issues = []
 
     # Define patterns for punctuation problems
-    excessive_punctuation_pattern = r"([!?.:,;])\1{1,}"  # Repeated punctuation marks (e.g., "!!")
-    redundant_periods_pattern = r"\.{2,}"  # Multiple consecutive periods (e.g., "...")
+    excessive_punctuation_pattern = r"([!?.:,;]{2,})"  # Two or more punctuation marks
+    repeated_word_pattern = r"\b(\w+)\s+\1\b"  # Repeated words (e.g., "the the")
 
     for slide_index, slide in enumerate(presentation.slides, start=1):
         for shape in slide.shapes:
@@ -234,25 +234,28 @@ def validate_punctuation(input_ppt):
                         if run.text.strip():
                             text = run.text
 
-                            # Check for repeated punctuation marks
-                            if re.search(excessive_punctuation_pattern, text):
+                            # Check excessive punctuation
+                            match = re.search(excessive_punctuation_pattern, text)
+                            if match:
+                                punctuation_marks = match.group(1)  # Extract punctuation
                                 punctuation_issues.append({
                                     'slide': slide_index,
                                     'issue': 'Punctuation Marks',
                                     'text': text,
-                                    'corrected': "Excessive punctuation marks detected"
+                                    'corrected': f"Excessive punctuation marks detected ({punctuation_marks})"
                                 })
 
-                            # Check for redundant periods
-                            elif re.search(redundant_periods_pattern, text):
+                            # Check repeated words
+                            if re.search(repeated_word_pattern, text, flags=re.IGNORECASE):
                                 punctuation_issues.append({
                                     'slide': slide_index,
                                     'issue': 'Punctuation Marks',
                                     'text': text,
-                                    'corrected': "Excessive periods detected"
+                                    'corrected': "Repeated words detected"
                                 })
 
     return punctuation_issues
+
 
 # Function to save issues to CSV
 def save_to_csv(issues, output_csv):
