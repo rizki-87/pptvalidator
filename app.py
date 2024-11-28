@@ -1,62 +1,70 @@
 import streamlit as st
+from matplotlib import font_manager
 from pptx import Presentation
-from pathlib import Path
-from datetime import datetime
-from main import (
-    check_inconsistent_fonts,
-    check_grammar_and_spelling,
-    check_punctuation_issues,
-    save_issues_to_csv,
-)
+from pptx.dml.color import RGBColor
+import os
+import tempfile
 
-# Streamlit Title
+# Title and description
 st.title("PPT Validator")
 st.write("This is a Streamlit app for validating PowerPoint presentations.")
 
-# Upload PPTX file
+# File upload widget
 uploaded_file = st.file_uploader("Upload a PowerPoint file", type=["pptx"])
 
-# Dropdown for default font selection
-default_font = st.selectbox("Select the default font for validation", ["Arial", "Calibri", "Times New Roman"])
+# Get the list of available system fonts
+available_fonts = sorted(set(f.name for f in font_manager.fontManager.ttflist))
 
-# Submit button
-if st.button("Run Validation"):
-    if uploaded_file is not None:
-        # Save the uploaded file locally
-        with open("uploaded_presentation.pptx", "wb") as f:
-            f.write(uploaded_file.read())
-        st.success("File uploaded successfully!")
+# Add more fonts manually if required
+additional_fonts = ["Arial", "Calibri", "Times New Roman"]
+all_fonts = sorted(set(available_fonts + additional_fonts))
 
-        # Validate PowerPoint file
-        try:
-            st.info("Starting validation...")
-            file_path = "uploaded_presentation.pptx"
-            output_pptx_path = f"highlighted_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
+# Dropdown for selecting the default font
+default_font = st.selectbox("Select the default font for validation", all_fonts)
 
-            # Step 1: Check for inconsistent fonts
-            font_issues = check_inconsistent_fonts(file_path, default_font, output_pptx_path)
+# Process the file after upload
+if uploaded_file:
+    # Display the name of the uploaded file
+    st.write(f"Uploaded file: {uploaded_file.name}")
 
-            # Step 2: Check for grammar and spelling issues
-            grammar_issues = check_grammar_and_spelling(file_path)
+    # Save the uploaded file temporarily
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_file:
+        temp_file.write(uploaded_file.read())
+        temp_file_path = temp_file.name
 
-            # Step 3: Check for punctuation issues
-            punctuation_issues = check_punctuation_issues(file_path)
+    st.write(f"Selected default font: {default_font}")
 
-            # Step 4: Save results to CSV
-            csv_file = save_issues_to_csv(font_issues, grammar_issues, punctuation_issues, "Validation_Report")
+    # Function to validate PowerPoint fonts
+    def validate_fonts(file_path, selected_font):
+        presentation = Presentation(file_path)
+        issues = []
 
-            # Show results
-            st.success("Validation completed!")
-            st.write(f"Font issues: {len(font_issues)}")
-            st.write(f"Grammar and spelling issues: {len(grammar_issues)}")
-            st.write(f"Punctuation issues: {len(punctuation_issues)}")
+        for slide_number, slide in enumerate(presentation.slides, start=1):
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    for paragraph in shape.text_frame.paragraphs:
+                        for run in paragraph.runs:
+                            current_font = run.font.name
+                            if current_font and current_font != selected_font:
+                                issues.append({
+                                    "slide": slide_number,
+                                    "text": run.text.strip(),
+                                    "font": current_font,
+                                })
+        return issues
 
-            # Provide download links
-            with open(csv_file, "rb") as f:
-                st.download_button("Download Validation Report (CSV)", f, file_name="Validation_Report.csv")
-            with open(output_pptx_path, "rb") as f:
-                st.download_button("Download Highlighted PowerPoint", f, file_name="Highlighted_Presentation.pptx")
-        except Exception as e:
-            st.error(f"An error occurred during validation: {e}")
+    # Perform validation
+    st.write("Processing the presentation...")
+    font_issues = validate_fonts(temp_file_path, default_font)
+
+    if font_issues:
+        st.write("Found font issues:")
+        for issue in font_issues:
+            st.write(
+                f"Slide {issue['slide']}: '{issue['text']}' (Font: {issue['font']}, Expected: {default_font})"
+            )
     else:
-        st.error("Please upload a PowerPoint file.")
+        st.success("No font issues found!")
+
+    # Clean up temporary file
+    os.unlink(temp_file_path)
