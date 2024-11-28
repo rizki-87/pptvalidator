@@ -223,12 +223,8 @@ def validate_punctuation(input_ppt):
     punctuation_issues = []
 
     # Define patterns for punctuation problems
-    excessive_punctuation_patterns = {
-        "Excessive periods": r"\.\.{2,}",  # Two or more periods
-        "Excessive commas": r",,{2,}",    # Two or more commas
-        "Excessive exclamation marks": r"!!{2,}",  # Two or more exclamation marks
-        "Excessive question marks": r"\?\?{2,}"    # Two or more question marks
-    }
+    excessive_punctuation_pattern = r"([!?.:,;])\1{1,}"  # Repeated punctuation marks (e.g., "!!")
+    redundant_periods_pattern = r"\.{2,}"  # Multiple consecutive periods (e.g., "...")
 
     for slide_index, slide in enumerate(presentation.slides, start=1):
         for shape in slide.shapes:
@@ -238,15 +234,23 @@ def validate_punctuation(input_ppt):
                         if run.text.strip():
                             text = run.text
 
-                            # Check for each punctuation pattern
-                            for issue, pattern in excessive_punctuation_patterns.items():
-                                if re.search(pattern, text):
-                                    punctuation_issues.append({
-                                        'slide': slide_index,
-                                        'issue': 'Punctuation Marks',
-                                        'text': text,
-                                        'corrected': issue  # Specify the issue type, e.g., "Excessive periods"
-                                    })
+                            # Check for repeated punctuation marks
+                            if re.search(excessive_punctuation_pattern, text):
+                                punctuation_issues.append({
+                                    'slide': slide_index,
+                                    'issue': 'Punctuation Marks',
+                                    'text': text,
+                                    'corrected': "Excessive punctuation marks detected"
+                                })
+
+                            # Check for redundant periods
+                            elif re.search(redundant_periods_pattern, text):
+                                punctuation_issues.append({
+                                    'slide': slide_index,
+                                    'issue': 'Punctuation Marks',
+                                    'text': text,
+                                    'corrected': "Excessive periods detected"
+                                })
 
     return punctuation_issues
 
@@ -280,23 +284,9 @@ def main():
             font_issues = validate_fonts(temp_ppt_path, default_font)
             punctuation_issues = validate_punctuation(temp_ppt_path)
 
-            # Grammar validation
-            grammar_issues = []
-            for issue in font_issues + punctuation_issues:
-                if issue['issue'] == 'Punctuation Marks':
-                    corrected_text = issue['corrected']  # Use punctuation-specific corrected message
-                else:
-                    corrected_text = correct_grammar(issue['text'])  # Perform grammar correction
-
-                grammar_issues.append({
-                    'slide': issue['slide'],
-                    'issue': issue['issue'],
-                    'text': issue['text'],
-                    'corrected': corrected_text
-                })
-
-            # Save to CSV
-            save_to_csv(grammar_issues, csv_output_path)
+            # Combine issues and save to CSV
+            combined_issues = font_issues + punctuation_issues
+            save_to_csv(combined_issues, csv_output_path)
 
             # Display success and download link
             st.success("Validation completed!")
@@ -305,4 +295,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
