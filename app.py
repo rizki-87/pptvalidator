@@ -173,57 +173,10 @@ import streamlit as st
 import tempfile
 from pathlib import Path
 from pptx import Presentation
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from spellchecker import SpellChecker
 import csv
 import re
 import string
-
-# Initialize T5 model
-MODEL_NAME = "t5-small"
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
-
-# Function to check grammar using T5 model
-def check_grammar(text):
-    if not text.strip():
-        return "No issues", text  # Return "No issues" for empty text
-    try:
-        input_text = f"grammar: {text}"
-        input_ids = tokenizer.encode(input_text, return_tensors="pt", truncation=True)
-        outputs = model.generate(input_ids, max_length=512)
-        corrected_text = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
-
-        # Only classify as "Grammatical error" if correction changes the structure significantly
-        if corrected_text.lower() != text.lower():
-            return "Grammatical error", corrected_text
-        return "No issues", text
-    except Exception as e:
-        st.error(f"Error in grammar check: {e}")
-        return "Error", text
-
-# Function to validate grammar in a presentation
-def validate_grammar(input_ppt):
-    presentation = Presentation(input_ppt)
-    grammar_issues = []
-
-    for slide_index, slide in enumerate(presentation.slides, start=1):
-        for shape in slide.shapes:
-            if shape.has_text_frame:
-                for paragraph in shape.text_frame.paragraphs:
-                    for run in paragraph.runs:
-                        if run.text.strip():
-                            issue, corrected_text = check_grammar(run.text)
-                            if issue == "Grammatical error":
-                                grammar_issues.append({
-                                    'slide': slide_index,
-                                    'issue': issue,
-                                    'text': run.text,
-                                    'corrected': corrected_text
-                                })
-
-    return grammar_issues
-
 
 # Function to detect and correct misspellings
 def detect_misspellings(text):
@@ -242,7 +195,6 @@ def detect_misspellings(text):
                 misspellings[word] = correction
 
     return misspellings
-
 
 # Integrate into the main logic
 def validate_spelling(input_ppt):
@@ -355,11 +307,10 @@ def main():
             # Run validations
             font_issues = validate_fonts(temp_ppt_path, default_font)
             punctuation_issues = validate_punctuation(temp_ppt_path)
-            grammar_issues = validate_grammar(temp_ppt_path)
             spelling_issues = validate_spelling(temp_ppt_path)
 
             # Combine issues and save to CSV
-            combined_issues = font_issues + punctuation_issues + grammar_issues + spelling_issues
+            combined_issues = font_issues + punctuation_issues + spelling_issues
             save_to_csv(combined_issues, csv_output_path)
 
             # Display success and download link
