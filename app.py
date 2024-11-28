@@ -24,7 +24,7 @@ def correct_grammar(text):
     return corrected_text
 
 # Function to validate fonts
-def validate_fonts(ppt_path, selected_font, output_ppt_path):
+def validate_fonts(ppt_path, selected_font):
     presentation = Presentation(ppt_path)
     font_issues = []
 
@@ -43,9 +43,10 @@ def validate_fonts(ppt_path, selected_font, output_ppt_path):
                             })
                             # Highlight text with inconsistent font
                             run.font.color.rgb = RGBColor(255, 0, 0)
-
-    presentation.save(output_ppt_path)
-    return font_issues
+    # Save highlighted presentation to a temporary file
+    temp_highlighted_ppt = tempfile.NamedTemporaryFile(delete=False, suffix=".pptx")
+    presentation.save(temp_highlighted_ppt.name)
+    return font_issues, temp_highlighted_ppt.name
 
 # Function to validate grammar and spelling
 def validate_grammar_and_spelling(ppt_path):
@@ -100,11 +101,10 @@ def validate_punctuation(ppt_path):
     return punctuation_issues
 
 # Function to save issues to CSV
-def save_issues_to_csv(font_issues, grammar_issues, punctuation_issues, output_name):
-    downloads_path = Path.home() / "Downloads"
-    csv_file_name = downloads_path / f"{output_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-
-    with open(csv_file_name, mode='w', newline='', encoding='utf-8-sig') as file:
+def save_issues_to_csv(font_issues, grammar_issues, punctuation_issues):
+    # Save issues to a temporary CSV file
+    temp_csv = tempfile.NamedTemporaryFile(delete=False, suffix=".csv", mode="w", encoding="utf-8-sig", newline="")
+    with open(temp_csv.name, mode="w", newline="", encoding="utf-8-sig") as file:
         writer = csv.writer(file)
         writer.writerow(["Slide Number", "Issue Type", "Original Text", "Details"])
 
@@ -116,8 +116,7 @@ def save_issues_to_csv(font_issues, grammar_issues, punctuation_issues, output_n
 
         for issue in punctuation_issues:
             writer.writerow([issue["slide"], "Punctuation Issue", issue["text"], issue["issue"]])
-
-    return csv_file_name
+    return temp_csv.name
 
 # Streamlit app starts here
 st.title("PPT Validator")
@@ -136,17 +135,13 @@ if uploaded_file and st.button("Run Validation"):
         temp_ppt.write(uploaded_file.read())
         temp_ppt_path = temp_ppt.name
 
-    # Paths for output files
-    downloads_path = Path.home() / "Downloads"
-    highlighted_ppt_path = downloads_path / "highlighted_presentation.pptx"
-
     # Run validations
-    font_issues = validate_fonts(temp_ppt_path, default_font, highlighted_ppt_path)
+    font_issues, highlighted_ppt_path = validate_fonts(temp_ppt_path, default_font)
     grammar_issues = validate_grammar_and_spelling(temp_ppt_path)
     punctuation_issues = validate_punctuation(temp_ppt_path)
 
     # Save issues to CSV
-    csv_file_path = save_issues_to_csv(font_issues, grammar_issues, punctuation_issues, "Validation_Report")
+    csv_file_path = save_issues_to_csv(font_issues, grammar_issues, punctuation_issues)
 
     # Display results
     st.write("### Validation Results:")
@@ -165,9 +160,11 @@ if uploaded_file and st.button("Run Validation"):
     st.download_button(
         label="Download CSV Report",
         data=open(csv_file_path, "rb").read(),
-        file_name=csv_file_path.name,
+        file_name="Validation_Report.csv",
         mime="text/csv",
     )
 
     # Clean up temporary file
     os.unlink(temp_ppt_path)
+    os.unlink(highlighted_ppt_path)
+    os.unlink(csv_file_path)
