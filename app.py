@@ -22,49 +22,45 @@ all_fonts = sorted(set(available_fonts + additional_fonts))
 # Dropdown for selecting the default font
 default_font = st.selectbox("Select the default font for validation", all_fonts)
 
-# Process the file after upload
-if uploaded_file:
-    # Display the name of the uploaded file
-    st.write(f"Uploaded file: {uploaded_file.name}")
+# Function to validate PowerPoint fonts
+def validate_fonts(file_path, selected_font):
+    presentation = Presentation(file_path)
+    issues = []
 
+    for slide_number, slide in enumerate(presentation.slides, start=1):
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        current_font = run.font.name
+                        if current_font and current_font != selected_font:
+                            issues.append({
+                                "slide": slide_number,
+                                "text": run.text.strip(),
+                                "font": current_font,
+                            })
+    return issues
+
+# Check if file is uploaded
+if uploaded_file:
     # Save the uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_file:
         temp_file.write(uploaded_file.read())
         temp_file_path = temp_file.name
 
-    st.write(f"Selected default font: {default_font}")
+    # Add a "Run Validation" button
+    if st.button("Run Validation"):
+        st.write("Processing the presentation...")
+        font_issues = validate_fonts(temp_file_path, default_font)
 
-    # Function to validate PowerPoint fonts
-    def validate_fonts(file_path, selected_font):
-        presentation = Presentation(file_path)
-        issues = []
+        if font_issues:
+            st.write("Found font issues:")
+            for issue in font_issues:
+                st.write(
+                    f"Slide {issue['slide']}: '{issue['text']}' (Font: {issue['font']}, Expected: {default_font})"
+                )
+        else:
+            st.success("No font issues found!")
 
-        for slide_number, slide in enumerate(presentation.slides, start=1):
-            for shape in slide.shapes:
-                if shape.has_text_frame:
-                    for paragraph in shape.text_frame.paragraphs:
-                        for run in paragraph.runs:
-                            current_font = run.font.name
-                            if current_font and current_font != selected_font:
-                                issues.append({
-                                    "slide": slide_number,
-                                    "text": run.text.strip(),
-                                    "font": current_font,
-                                })
-        return issues
-
-    # Perform validation
-    st.write("Processing the presentation...")
-    font_issues = validate_fonts(temp_file_path, default_font)
-
-    if font_issues:
-        st.write("Found font issues:")
-        for issue in font_issues:
-            st.write(
-                f"Slide {issue['slide']}: '{issue['text']}' (Font: {issue['font']}, Expected: {default_font})"
-            )
-    else:
-        st.success("No font issues found!")
-
-    # Clean up temporary file
-    os.unlink(temp_file_path)
+        # Clean up temporary file
+        os.unlink(temp_file_path)
