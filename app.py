@@ -182,19 +182,26 @@ MODEL_NAME = "t5-small"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
 
-# Function to correct grammar using T5 model
-def correct_grammar(text):
+# Function to check grammar and spelling
+def check_grammar_and_spelling(text):
     if not text.strip():
-        return text  # Return original text if empty
+        return "No issues", text  # Return "No issues" for empty text
     try:
         input_text = f"grammar: {text}"
         input_ids = tokenizer.encode(input_text, return_tensors="pt", truncation=True)
         outputs = model.generate(input_ids, max_length=512)
         corrected_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return corrected_text
+
+        # Classify issue based on comparison
+        if corrected_text.lower() != text.lower():  # Case insensitive comparison
+            if any(word not in corrected_text for word in text.split()):  # Misspelling detected
+                return "Misspelling", corrected_text
+            else:  # Otherwise classify as grammatical error
+                return "Grammatical error", corrected_text
+        return "No issues", text
     except Exception as e:
-        st.error(f"Error in grammar correction: {e}")
-        return text
+        st.error(f"Error in grammar/spelling check: {e}")
+        return "Error", text
 
 # Function to validate fonts in a presentation
 def validate_fonts(input_ppt, default_font):
@@ -256,6 +263,27 @@ def validate_punctuation(input_ppt):
 
     return punctuation_issues
 
+# Function to validate grammar and spelling in a presentation
+def validate_grammar_and_spelling(input_ppt):
+    presentation = Presentation(input_ppt)
+    grammar_issues = []
+
+    for slide_index, slide in enumerate(presentation.slides, start=1):
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        if run.text.strip():
+                            issue, corrected_text = check_grammar_and_spelling(run.text)
+                            if issue != "No issues":
+                                grammar_issues.append({
+                                    'slide': slide_index,
+                                    'issue': issue,
+                                    'text': run.text,
+                                    'corrected': corrected_text
+                                })
+
+    return grammar_issues
 
 # Function to save issues to CSV
 def save_to_csv(issues, output_csv):
@@ -286,9 +314,10 @@ def main():
             # Run validations
             font_issues = validate_fonts(temp_ppt_path, default_font)
             punctuation_issues = validate_punctuation(temp_ppt_path)
+            grammar_issues = validate_grammar_and_spelling(temp_ppt_path)
 
             # Combine issues and save to CSV
-            combined_issues = font_issues + punctuation_issues
+            combined_issues = font_issues + punctuation_issues + grammar_issues
             save_to_csv(combined_issues, csv_output_path)
 
             # Display success and download link
@@ -298,3 +327,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
