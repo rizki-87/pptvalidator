@@ -177,6 +177,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from spellchecker import SpellChecker
 import csv
 import re
+import string
 
 # Initialize T5 model
 MODEL_NAME = "t5-small"
@@ -188,10 +189,19 @@ def detect_misspellings(text):
     spell = SpellChecker()
     words = text.split()
     misspellings = {}
+
     for word in words:
-        if word.lower() not in spell:
-            misspellings[word] = spell.correction(word) or word  # Suggest correction or keep original word
+        # Remove punctuation from the word for checking
+        clean_word = word.strip(string.punctuation)
+        
+        # Check if the word is misspelled
+        if clean_word and clean_word.lower() not in spell:
+            correction = spell.correction(clean_word)
+            if correction:  # Only suggest if there's a valid correction
+                misspellings[word] = correction
+
     return misspellings
+
 
 # Integrate into the main logic
 def validate_spelling(input_ppt):
@@ -205,11 +215,11 @@ def validate_spelling(input_ppt):
                     for run in paragraph.runs:
                         if run.text.strip():
                             misspellings = detect_misspellings(run.text)
-                            for word, correction in misspellings.items():
+                            for original_word, correction in misspellings.items():
                                 spelling_issues.append({
                                     'slide': slide_index,
                                     'issue': 'Misspelling',
-                                    'text': f"Original: {word}",
+                                    'text': f"Original: {original_word}",
                                     'corrected': f"Suggestion: {correction}"
                                 })
 
