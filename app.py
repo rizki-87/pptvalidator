@@ -175,6 +175,7 @@ from pathlib import Path
 from pptx import Presentation
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import csv
+import re
 
 # Initialize T5 model
 MODEL_NAME = "t5-small"
@@ -198,43 +199,77 @@ def correct_grammar(text):
 # Function to validate fonts in a presentation
 def validate_fonts(input_ppt, default_font):
     presentation = Presentation(input_ppt)
-    font_issues = []
+    issues = []
 
     for slide_index, slide in enumerate(presentation.slides, start=1):
         for shape in slide.shapes:
             if shape.has_text_frame:
                 for paragraph in shape.text_frame.paragraphs:
                     for run in paragraph.runs:
-                        if run.font.name != default_font:
-                            font_issues.append({
-                                'slide': slide_index,
-                                'issue': 'Font Issue',
-                                'text': run.text,
-                                'corrected': ""
-                            })
+                        if run.text.strip():  # Skip empty text
+                            # Check for inconsistent fonts
+                            if run.font.name != default_font:
+                                issues.append({
+                                    'slide': slide_index,
+                                    'issue': 'Inconsistent Font',
+                                    'text': run.text,
+                                    'corrected': ""
+                                })
+    return issues
 
-    return font_issues
+# Function to detect punctuation issues
+def validate_punctuation(input_ppt):
+    presentation = Presentation(input_ppt)
+    punctuation_issues = []
+
+    # Define patterns for punctuation problems
+    excessive_punctuation_pattern = r"(?:[!?.:,;]{2,})"  # Two or more punctuation marks
+    repeated_word_pattern = r"\b(\w+)\s+\1\b"  # Repeated words (e.g., "the the")
+
+    for slide_index, slide in enumerate(presentation.slides, start=1):
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        if run.text.strip():
+                            text = run.text
+
+                            # Check excessive punctuation
+                            if re.search(excessive_punctuation_pattern, text):
+                                punctuation_issues.append({
+                                    'slide': slide_index,
+                                    'issue': 'Punctuation Marks',
+                                    'text': text,
+                                    'corrected': re.sub(excessive_punctuation_pattern, "", text)
+                                })
+
+                            # Check repeated words
+                            if re.search(repeated_word_pattern, text, flags=re.IGNORECASE):
+                                punctuation_issues.append({
+                                    'slide': slide_index,
+                                    'issue': 'Punctuation Marks',
+                                    'text': text,
+                                    'corrected': re.sub(repeated_word_pattern, r"\1", text, flags=re.IGNORECASE)
+                                })
+
+    return punctuation_issues
 
 # Function to save issues to CSV
 def save_to_csv(issues, output_csv):
-    # Filter out slides that have no issues
-    issues_with_content = [issue for issue in issues if issue['text'].strip()]
     with open(output_csv, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=['slide', 'issue', 'text', 'corrected'])
         writer.writeheader()
-        writer.writerows(issues_with_content)
+        writer.writerows(issues)
 
 # Main Streamlit app
 def main():
     st.title("PPT Validator")
 
-    # File uploader
     uploaded_file = st.file_uploader("Upload a PowerPoint file", type=["pptx"])
 
     font_options = ["Arial", "Calibri", "Times New Roman", "Verdana", "Helvetica"]
     default_font = st.selectbox("Select the default font for validation", font_options)
 
-    # Run Validation button
     if uploaded_file and st.button("Run Validation"):
         with tempfile.TemporaryDirectory() as tmpdir:
             # Save uploaded file temporarily
@@ -242,33 +277,34 @@ def main():
             with open(temp_ppt_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
 
-            # Output paths
+            # Output path
             csv_output_path = Path(tmpdir) / "validation_report.csv"
 
-            # Validate fonts
+            # Run validations
             font_issues = validate_fonts(temp_ppt_path, default_font)
+            punctuation_issues = validate_punctuation(temp_ppt_path)
 
             # Grammar validation
             grammar_issues = []
-            for issue in font_issues:
+            for issue in font_issues + punctuation_issues:
                 corrected_text = correct_grammar(issue['text'])
                 if corrected_text != issue['text']:
                     grammar_issues.append({
                         'slide': issue['slide'],
-                        'issue': issue['issue'],
+                        'issue': 'Grammar Issue' if issue['issue'] != 'Inconsistent Font' else issue['issue'],
                         'text': issue['text'],
                         'corrected': corrected_text
                     })
+                else:
+                    grammar_issues.append(issue)  # Append as is if no correction
 
             # Save to CSV
             save_to_csv(grammar_issues, csv_output_path)
 
-            # Show success message
+            # Display success and download link
             st.success("Validation completed!")
-            st.download_button("Download Validation Report (CSV)",
-                               csv_output_path.read_bytes(),
+            st.download_button("Download Validation Report (CSV)", csv_output_path.read_bytes(),
                                file_name="validation_report.csv")
 
 if __name__ == "__main__":
     main()
-
