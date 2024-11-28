@@ -227,17 +227,26 @@ def save_to_csv(issues, output_csv):
 # Main Streamlit app
 def main():
     st.title("PPT Validator")
+
+    # Create session state for uploaded file
+    if "uploaded_file" not in st.session_state:
+        st.session_state.uploaded_file = None
+
     uploaded_file = st.file_uploader("Upload a PowerPoint file", type=["pptx"])
+
+    # Update session state with uploaded file
+    if uploaded_file:
+        st.session_state.uploaded_file = uploaded_file
 
     font_options = ["Arial", "Calibri", "Times New Roman", "Verdana", "Helvetica"]
     default_font = st.selectbox("Select the default font for validation", font_options)
 
-    if uploaded_file and st.button("Run Validation"):
+    if st.session_state.uploaded_file and st.button("Run Validation"):
         with tempfile.TemporaryDirectory() as tmpdir:
             # Save uploaded file temporarily
             temp_ppt_path = Path(tmpdir) / "uploaded_ppt.pptx"
             with open(temp_ppt_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
+                f.write(st.session_state.uploaded_file.getbuffer())
 
             # Output paths
             csv_output_path = Path(tmpdir) / "validation_report.csv"
@@ -265,9 +274,14 @@ def main():
             st.download_button("Download Validation Report (CSV)", csv_output_path.read_bytes(),
                                file_name="validation_report.csv")
 
+    # Reset button functionality
     if st.button("Reset"):
-        # Clear session state to reset the app
+        # Clear uploaded file and reset session state
+        st.session_state.uploaded_file = None
         st.session_state.clear()
+
+        # Refresh the app to the initial state
+        st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
