@@ -170,167 +170,103 @@
 #     os.unlink(csv_file_path)
 
 import streamlit as st
-from pptx import Presentation
-from pptx.dml.color import RGBColor
-from pathlib import Path
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-from concurrent.futures import ThreadPoolExecutor
-import re
 import tempfile
+from pathlib import Path
+from pptx import Presentation
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 import csv
-import time
-import os
 
-# Initialize the T5 model
+# Initialize T5 model
 MODEL_NAME = "t5-small"
-CACHE_DIR = "./model_cache"
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
 
-# Load model and tokenizer
-@st.cache_resource
-def load_model():
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, cache_dir=CACHE_DIR)
-    model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME, cache_dir=CACHE_DIR)
-    return tokenizer, model
-
-tokenizer, model = load_model()
-
-# Define font list
-DEFAULT_FONTS = [
-    "Arial", "Calibri", "Times New Roman", "Verdana", "Tahoma",
-    "Georgia", "Comic Sans MS", "Impact", "Courier New", "Lucida Console",
-    "DejaVu Sans", "DejaVu Serif", "STIXGeneral"
-]
-
-# Function for grammar correction
+# Function to correct grammar using T5 model
 def correct_grammar(text):
-    input_text = f"grammar: {text}"
-    input_ids = tokenizer.encode(input_text, return_tensors="pt")
-    outputs = model.generate(input_ids, max_length=512)
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+    if not text.strip():
+        return text  # Return original text if empty
+    try:
+        input_text = f"grammar: {text}"
+        input_ids = tokenizer.encode(input_text, return_tensors="pt", truncation=True)
+        outputs = model.generate(input_ids, max_length=512)
+        corrected_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        return corrected_text
+    except Exception as e:
+        st.error(f"Error in grammar correction: {e}")
+        return text
 
-# Function to validate fonts
-def validate_fonts(file_path, default_font, output_ppt_path):
-    presentation = Presentation(file_path)
+# Function to validate fonts in a presentation
+def validate_fonts(input_ppt, default_font):
+    presentation = Presentation(input_ppt)
     font_issues = []
+
     for slide_index, slide in enumerate(presentation.slides, start=1):
         for shape in slide.shapes:
             if shape.has_text_frame:
                 for paragraph in shape.text_frame.paragraphs:
                     for run in paragraph.runs:
-                        font_name = getattr(run.font, "name", None)
-                        if font_name and font_name != default_font:
-                            font_issues.append(
-                                {"slide": slide_index, "issue": "Font Issue", "text": run.text, "detail": font_name}
-                            )
-                            run.font.color.rgb = RGBColor(255, 0, 0)  # Highlight text
+                        if run.font.name != default_font:
+                            font_issues.append({
+                                'slide': slide_index,
+                                'issue': 'Font Issue',
+                                'text': run.text,
+                                'corrected': ""
+                            })
 
-    presentation.save(output_ppt_path)
     return font_issues
 
-# Function to check grammar and punctuation in parallel
-def check_grammar_punctuation(slides_texts):
-    def process_slide_text(slide_text):
-        corrected_text = correct_grammar(slide_text)
-        if corrected_text != slide_text:
-            return {"issue": "Grammar Issue", "original": slide_text, "corrected": corrected_text}
-        return None
-
-    with ThreadPoolExecutor() as executor:
-        results = list(executor.map(process_slide_text, slides_texts))
-    return [result for result in results if result]
-
-# Function to save CSV
-def save_csv(data, output_csv_path):
-    with open(output_csv_path, mode="w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=["slide", "issue", "text", "detail"])
+# Function to save issues to CSV
+def save_to_csv(issues, output_csv):
+    # Filter out slides that have no issues
+    issues_with_content = [issue for issue in issues if issue['issue'] != ""]
+    with open(output_csv, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=['slide', 'issue', 'text', 'corrected'])
         writer.writeheader()
-        for row in data:
-            writer.writerow(row)
+        writer.writerows(issues_with_content)
 
-# Streamlit UI
+# Main Streamlit app
 def main():
     st.title("PPT Validator")
-    st.write("This is a Streamlit app for validating PowerPoint presentations.")
-
-    if "validation_complete" not in st.session_state:
-        st.session_state.validation_complete = False
-        st.session_state.output_csv_path = None
-        st.session_state.highlighted_ppt_path = None
-
-    if "reset" not in st.session_state:
-        st.session_state.reset = False
-
-    if st.session_state.reset:
-        st.session_state.validation_complete = False
-        st.session_state.output_csv_path = None
-        st.session_state.highlighted_ppt_path = None
-        st.session_state.reset = False
-        st.experimental_rerun()
-
     uploaded_file = st.file_uploader("Upload a PowerPoint file", type=["pptx"])
-    default_font = st.selectbox("Select the default font for validation", DEFAULT_FONTS)
 
-    if uploaded_file and default_font:
-        if st.button("Run Validation"):
-            with st.spinner("Processing the presentation..."):
-                start_time = time.time()
+    font_options = ["Arial", "Calibri", "Times New Roman", "Verdana", "Helvetica"]
+    default_font = st.selectbox("Select the default font for validation", font_options)
 
-                # Save uploaded file to a temporary location
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_file:
-                    temp_file.write(uploaded_file.read())
-                    temp_ppt_path = temp_file.name
+    if uploaded_file and st.button("Run Validation"):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Save uploaded file temporarily
+            temp_ppt_path = Path(tmpdir) / "uploaded_ppt.pptx"
+            with open(temp_ppt_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
 
-                # Paths for output files
-                highlighted_ppt_path = Path(tempfile.gettempdir()) / "highlighted_presentation.pptx"
-                output_csv_path = Path(tempfile.gettempdir()) / "validation_report.csv"
+            # Output paths
+            csv_output_path = Path(tmpdir) / "validation_report.csv"
 
-                # Validate fonts
-                font_issues = validate_fonts(temp_ppt_path, default_font, highlighted_ppt_path)
+            # Validate fonts
+            font_issues = validate_fonts(temp_ppt_path, default_font)
 
-                # Extract texts for grammar and punctuation checking
-                presentation = Presentation(temp_ppt_path)
-                slides_texts = [
-                    " ".join(run.text for shape in slide.shapes if shape.has_text_frame
-                             for paragraph in shape.text_frame.paragraphs
-                             for run in paragraph.runs)
-                    for slide in presentation.slides
-                ]
+            # Grammar validation
+            grammar_issues = []
+            for issue in font_issues:
+                corrected_text = correct_grammar(issue['text'])
+                if corrected_text != issue['text']:
+                    grammar_issues.append({
+                        'slide': issue['slide'],
+                        'issue': issue['issue'],
+                        'text': issue['text'],
+                        'corrected': corrected_text
+                    })
 
-                # Run grammar and punctuation check
-                grammar_punctuation_issues = check_grammar_punctuation(slides_texts)
+            # Save to CSV
+            save_to_csv(grammar_issues, csv_output_path)
 
-                # Combine all issues
-                all_issues = font_issues + [
-                    {"slide": i + 1, "issue": gp["issue"], "text": gp["original"], "detail": gp["corrected"]}
-                    for i, gp in enumerate(grammar_punctuation_issues)
-                ]
+            # Display download link for CSV
+            st.success("Validation completed!")
+            st.download_button("Download Validation Report (CSV)", csv_output_path.read_bytes(),
+                               file_name="validation_report.csv")
 
-                # Save to CSV
-                save_csv(all_issues, output_csv_path)
-
-                # Update session state
-                st.session_state.validation_complete = True
-                st.session_state.output_csv_path = output_csv_path
-                st.session_state.highlighted_ppt_path = highlighted_ppt_path
-
-                end_time = time.time()
-                st.success(f"Validation completed in {round(end_time - start_time, 2)} seconds!")
-
-    if st.session_state.validation_complete:
-        st.download_button(
-            label="Download validation report (CSV)",
-            data=open(st.session_state.output_csv_path, "rb").read(),
-            file_name="validation_report.csv",
-            mime="text/csv",
-        )
-        st.download_button(
-            label="Download highlighted PowerPoint",
-            data=open(st.session_state.highlighted_ppt_path, "rb").read(),
-            file_name="highlighted_presentation.pptx",
-            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        )
-        if st.button("Reset"):
-            st.session_state.reset = True
+    if st.button("Reset"):
+        st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
