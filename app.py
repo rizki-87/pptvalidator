@@ -177,7 +177,9 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 from concurrent.futures import ThreadPoolExecutor
 import re
 import tempfile
+import csv
 import time
+import os
 
 # Initialize the T5 model
 MODEL_NAME = "t5-small"
@@ -218,81 +220,117 @@ def validate_fonts(file_path, default_font, output_ppt_path):
                         font_name = getattr(run.font, "name", None)
                         if font_name and font_name != default_font:
                             font_issues.append(
-                                f"Slide {slide_index}: '{run.text}' (Font: {font_name})"
+                                {"slide": slide_index, "issue": "Font Issue", "text": run.text, "detail": font_name}
                             )
                             run.font.color.rgb = RGBColor(255, 0, 0)  # Highlight text
 
     presentation.save(output_ppt_path)
     return font_issues
 
-# Function to check grammar issues in parallel
-def check_grammar(slides_texts):
+# Function to check grammar and punctuation in parallel
+def check_grammar_punctuation(slides_texts):
     def process_slide_text(slide_text):
         corrected_text = correct_grammar(slide_text)
-        return {"original": slide_text, "corrected": corrected_text}
+        if corrected_text != slide_text:
+            return {"issue": "Grammar Issue", "original": slide_text, "corrected": corrected_text}
+        return None
 
     with ThreadPoolExecutor() as executor:
         results = list(executor.map(process_slide_text, slides_texts))
-    return results
+    return [result for result in results if result]
+
+# Function to save CSV
+def save_csv(data, output_csv_path):
+    with open(output_csv_path, mode="w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=["slide", "issue", "text", "detail"])
+        writer.writeheader()
+        for row in data:
+            writer.writerow(row)
 
 # Streamlit UI
-st.title("PPT Validator")
-st.write("This is a Streamlit app for validating PowerPoint presentations.")
+def main():
+    st.title("PPT Validator")
+    st.write("This is a Streamlit app for validating PowerPoint presentations.")
 
-uploaded_file = st.file_uploader("Upload a PowerPoint file", type=["pptx"])
-default_font = st.selectbox("Select the default font for validation", DEFAULT_FONTS)
-if uploaded_file and default_font:
-    if st.button("Run Validation"):
-        with st.spinner("Processing the presentation..."):
-            start_time = time.time()
+    if "validation_complete" not in st.session_state:
+        st.session_state.validation_complete = False
+        st.session_state.output_csv_path = None
+        st.session_state.highlighted_ppt_path = None
 
-            # Save uploaded file to a temporary location
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_file:
-                temp_file.write(uploaded_file.read())
-                temp_ppt_path = temp_file.name
+    if "reset" not in st.session_state:
+        st.session_state.reset = False
 
-            # Paths for output files
-            highlighted_ppt_path = Path(tempfile.gettempdir()) / "highlighted_presentation.pptx"
+    if st.session_state.reset:
+        st.session_state.validation_complete = False
+        st.session_state.output_csv_path = None
+        st.session_state.highlighted_ppt_path = None
+        st.session_state.reset = False
+        st.experimental_rerun()
 
-            # Validate fonts
-            font_issues = validate_fonts(temp_ppt_path, default_font, highlighted_ppt_path)
+    uploaded_file = st.file_uploader("Upload a PowerPoint file", type=["pptx"])
+    default_font = st.selectbox("Select the default font for validation", DEFAULT_FONTS)
 
-            # Extract texts for grammar checking
-            presentation = Presentation(temp_ppt_path)
-            slides_texts = [
-                " ".join(run.text for shape in slide.shapes if shape.has_text_frame
-                         for paragraph in shape.text_frame.paragraphs
-                         for run in paragraph.runs)
-                for slide in presentation.slides
-            ]
+    if uploaded_file and default_font:
+        if st.button("Run Validation"):
+            with st.spinner("Processing the presentation..."):
+                start_time = time.time()
 
-            # Run grammar check in parallel
-            grammar_results = check_grammar(slides_texts)
+                # Save uploaded file to a temporary location
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pptx") as temp_file:
+                    temp_file.write(uploaded_file.read())
+                    temp_ppt_path = temp_file.name
 
-            # End processing
-            end_time = time.time()
+                # Paths for output files
+                highlighted_ppt_path = Path(tempfile.gettempdir()) / "highlighted_presentation.pptx"
+                output_csv_path = Path(tempfile.gettempdir()) / "validation_report.csv"
 
-        # Display results
-        st.success("Validation completed!")
-        st.write(f"Processing time: {round(end_time - start_time, 2)} seconds")
+                # Validate fonts
+                font_issues = validate_fonts(temp_ppt_path, default_font, highlighted_ppt_path)
 
-        if font_issues:
-            st.subheader("Found font issues:")
-            st.write("\n".join(font_issues))
+                # Extract texts for grammar and punctuation checking
+                presentation = Presentation(temp_ppt_path)
+                slides_texts = [
+                    " ".join(run.text for shape in slide.shapes if shape.has_text_frame
+                             for paragraph in shape.text_frame.paragraphs
+                             for run in paragraph.runs)
+                    for slide in presentation.slides
+                ]
 
-        if grammar_results:
-            st.subheader("Grammar corrections:")
-            for result in grammar_results:
-                st.write(f"Original: {result['original']}")
-                st.write(f"Corrected: {result['corrected']}")
-                st.write("---")
+                # Run grammar and punctuation check
+                grammar_punctuation_issues = check_grammar_punctuation(slides_texts)
 
-        # Provide download links for highlighted PPT
-        with open(highlighted_ppt_path, "rb") as f:
-            st.download_button(
-                label="Download highlighted PowerPoint",
-                data=f,
-                file_name="highlighted_presentation.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            )
+                # Combine all issues
+                all_issues = font_issues + [
+                    {"slide": i + 1, "issue": gp["issue"], "text": gp["original"], "detail": gp["corrected"]}
+                    for i, gp in enumerate(grammar_punctuation_issues)
+                ]
 
+                # Save to CSV
+                save_csv(all_issues, output_csv_path)
+
+                # Update session state
+                st.session_state.validation_complete = True
+                st.session_state.output_csv_path = output_csv_path
+                st.session_state.highlighted_ppt_path = highlighted_ppt_path
+
+                end_time = time.time()
+                st.success(f"Validation completed in {round(end_time - start_time, 2)} seconds!")
+
+    if st.session_state.validation_complete:
+        st.download_button(
+            label="Download validation report (CSV)",
+            data=open(st.session_state.output_csv_path, "rb").read(),
+            file_name="validation_report.csv",
+            mime="text/csv",
+        )
+        st.download_button(
+            label="Download highlighted PowerPoint",
+            data=open(st.session_state.highlighted_ppt_path, "rb").read(),
+            file_name="highlighted_presentation.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
+        if st.button("Reset"):
+            st.session_state.reset = True
+
+if __name__ == "__main__":
+    main()
