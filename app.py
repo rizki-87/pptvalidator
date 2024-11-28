@@ -218,7 +218,7 @@ def validate_fonts(input_ppt, default_font):
 # Function to save issues to CSV
 def save_to_csv(issues, output_csv):
     # Filter out slides that have no issues
-    issues_with_content = [issue for issue in issues if issue['issue'] != ""]
+    issues_with_content = [issue for issue in issues if issue['text'].strip()]
     with open(output_csv, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=['slide', 'issue', 'text', 'corrected'])
         writer.writeheader()
@@ -266,7 +266,8 @@ def main():
                                file_name="validation_report.csv")
 
     if st.button("Reset"):
-        st.experimental_rerun()
+        # Clear session state to reset the app
+        st.session_state.clear()
 
 if __name__ == "__main__":
     main()
