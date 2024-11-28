@@ -212,16 +212,33 @@ def validate_grammar(input_ppt):
                 for paragraph in shape.text_frame.paragraphs:
                     for run in paragraph.runs:
                         if run.text.strip():
-                            issue, corrected_text = check_grammar(run.text)
-                            if issue != "No issues":
+                            text = run.text
+
+                            # Detect punctuation issues first
+                            excessive_punctuation_pattern = r"([!?.:,;]{2,})"
+                            match = re.search(excessive_punctuation_pattern, text)
+                            if match:
+                                punctuation_marks = match.group(1)
                                 grammar_issues.append({
                                     'slide': slide_index,
-                                    'issue': issue,
-                                    'text': run.text,
+                                    'issue': 'Punctuation Marks',
+                                    'text': text,
+                                    'corrected': f"Excessive punctuation marks detected ({punctuation_marks})"
+                                })
+                                continue  # Skip further grammar checking if punctuation issue detected
+
+                            # Check for grammar errors
+                            issue, corrected_text = check_grammar(text)
+                            if issue == "Grammatical error":
+                                grammar_issues.append({
+                                    'slide': slide_index,
+                                    'issue': 'Grammatical error',
+                                    'text': text,
                                     'corrected': corrected_text
                                 })
 
     return grammar_issues
+
 
 
 # Function to detect and correct misspellings
