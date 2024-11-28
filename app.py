@@ -213,7 +213,7 @@ def validate_fonts(input_ppt, default_font):
                                     'slide': slide_index,
                                     'issue': 'Inconsistent Font',
                                     'text': run.text,
-                                    'corrected': ""
+                                    'corrected': f"Expected font: {default_font}"
                                 })
     return issues
 
@@ -287,16 +287,17 @@ def main():
             # Grammar validation
             grammar_issues = []
             for issue in font_issues + punctuation_issues:
-                corrected_text = correct_grammar(issue['text'])
-                if corrected_text != issue['text']:
-                    grammar_issues.append({
-                        'slide': issue['slide'],
-                        'issue': 'Grammar Issue' if issue['issue'] != 'Inconsistent Font' else issue['issue'],
-                        'text': issue['text'],
-                        'corrected': corrected_text
-                    })
+                if issue['issue'] == 'Inconsistent Font':
+                    corrected_text = issue['corrected']  # Use font-specific corrected message
                 else:
-                    grammar_issues.append(issue)  # Append as is if no correction
+                    corrected_text = correct_grammar(issue['text'])  # Perform grammar correction
+
+                grammar_issues.append({
+                    'slide': issue['slide'],
+                    'issue': issue['issue'],
+                    'text': issue['text'],
+                    'corrected': corrected_text
+                })
 
             # Save to CSV
             save_to_csv(grammar_issues, csv_output_path)
