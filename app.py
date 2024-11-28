@@ -228,28 +228,19 @@ def save_to_csv(issues, output_csv):
 def main():
     st.title("PPT Validator")
 
-    # Create session state for uploaded file and validation status
-    if "uploaded_file" not in st.session_state:
-        st.session_state.uploaded_file = None
-        st.session_state.validated = False
-
     # File uploader
     uploaded_file = st.file_uploader("Upload a PowerPoint file", type=["pptx"])
-
-    # Store the uploaded file in session state
-    if uploaded_file:
-        st.session_state.uploaded_file = uploaded_file
 
     font_options = ["Arial", "Calibri", "Times New Roman", "Verdana", "Helvetica"]
     default_font = st.selectbox("Select the default font for validation", font_options)
 
     # Run Validation button
-    if st.session_state.uploaded_file and st.button("Run Validation"):
+    if uploaded_file and st.button("Run Validation"):
         with tempfile.TemporaryDirectory() as tmpdir:
             # Save uploaded file temporarily
             temp_ppt_path = Path(tmpdir) / "uploaded_ppt.pptx"
             with open(temp_ppt_path, "wb") as f:
-                f.write(st.session_state.uploaded_file.getbuffer())
+                f.write(uploaded_file.getbuffer())
 
             # Output paths
             csv_output_path = Path(tmpdir) / "validation_report.csv"
@@ -272,25 +263,11 @@ def main():
             # Save to CSV
             save_to_csv(grammar_issues, csv_output_path)
 
-            # Update validation status
-            st.session_state.validated = True
-            st.session_state.csv_path = csv_output_path.read_bytes()
-
             # Show success message
             st.success("Validation completed!")
             st.download_button("Download Validation Report (CSV)",
-                               st.session_state.csv_path,
+                               csv_output_path.read_bytes(),
                                file_name="validation_report.csv")
-
-    # Reset button functionality
-    if st.button("Reset"):
-        # Clear session state variables without reloading
-        st.session_state.uploaded_file = None
-        st.session_state.validated = False
-        st.session_state.csv_path = None
-
-        # Clear all widgets
-        st.experimental_set_query_params()
 
 if __name__ == "__main__":
     main()
