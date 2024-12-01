@@ -11,5 +11,7 @@ torchvision==0.20.1
 tqdm==4.67.1
 transformers==4.46.3
 pyspellchecker==0.7.1
+language-tool-python
+
 
 
