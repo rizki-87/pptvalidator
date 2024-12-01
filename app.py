@@ -3,46 +3,42 @@ import tempfile
 from pathlib import Path
 from pptx import Presentation
 from spellchecker import SpellChecker
-import requests
 import csv
 import re
 import string
+import requests
 
-# Function to check grammar using LanguageTool API
-def check_grammar_with_api(text):
+# LanguageTool public API endpoint (no API key required)
+LANGUAGE_TOOL_API = "https://api.languagetool.org/v2/check"
+
+# Function to check grammar using LanguageTool API (no API Key required)
+def check_grammar(text):
     if not text.strip():
         return "No issues", text  # Return "No issues" for empty text
     try:
-        url = "https://api.languagetoolplus.com/v2/check"  # API endpoint
         payload = {
             'text': text,
-            'language': 'en-US',  # Set language (can be dynamic)
+            'language': 'en-US',
+            'enabledOnly': 'false'
         }
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        }
-        response = requests.post(url, data=payload, headers=headers)
-        result = response.json()
+        response = requests.post(LANGUAGE_TOOL_API, data=payload)
+        response_data = response.json()
 
-        issues = []
-        corrected_text = text  # Default corrected text is the original text
-
-        for match in result.get("matches", []):
-            replacements = match.get("replacements", [])
-            if replacements:
-                # Apply first replacement suggestion
-                replacement = replacements[0]["value"]
-                start = match["offset"]
-                end = start + match["length"]
-
-                # Correct text dynamically
-                corrected_text = corrected_text[:start] + replacement + corrected_text[end:]
-
-        if corrected_text.lower() != text.lower():
-            return "Grammatical error", corrected_text
+        if 'matches' in response_data and response_data['matches']:
+            # Apply suggested fixes
+            corrected_text = text
+            for match in reversed(response_data['matches']):  # Reverse to avoid index conflicts
+                if 'replacement' in match and match['replacement']:
+                    start = match['offset']
+                    end = start + match['length']
+                    corrected_text = corrected_text[:start] + match['replacement'][0] + corrected_text[end:]
+            
+            if corrected_text.lower() != text.lower():  # Only record if there are significant changes
+                return "Grammatical error", corrected_text
         return "No issues", text
     except Exception as e:
-        return f"Error: {e}", text
+        st.error(f"Error in grammar check: {e}")
+        return "Error", text
 
 # Function to validate grammar in a presentation
 def validate_grammar(input_ppt):
@@ -55,7 +51,7 @@ def validate_grammar(input_ppt):
                 for paragraph in shape.text_frame.paragraphs:
                     for run in paragraph.runs:
                         if run.text.strip():
-                            issue, corrected_text = check_grammar_with_api(run.text)
+                            issue, corrected_text = check_grammar(run.text)
                             if issue != "No issues":
                                 grammar_issues.append({
                                     'slide': slide_index,
@@ -65,7 +61,6 @@ def validate_grammar(input_ppt):
                                 })
 
     return grammar_issues
-
 
 # Function to detect and correct misspellings
 def detect_misspellings(text):
@@ -84,7 +79,6 @@ def detect_misspellings(text):
                 misspellings[word] = correction
 
     return misspellings
-
 
 # Integrate into the main logic
 def validate_spelling(input_ppt):
@@ -197,11 +191,11 @@ def main():
             # Run validations
             font_issues = validate_fonts(temp_ppt_path, default_font)
             punctuation_issues = validate_punctuation(temp_ppt_path)
-            spelling_issues = validate_spelling(temp_ppt_path)
             grammar_issues = validate_grammar(temp_ppt_path)
+            spelling_issues = validate_spelling(temp_ppt_path)
 
             # Combine issues and save to CSV
-            combined_issues = font_issues + punctuation_issues + spelling_issues + grammar_issues
+            combined_issues = font_issues + punctuation_issues + grammar_issues + spelling_issues
             save_to_csv(combined_issues, csv_output_path)
 
             # Display success and download link
