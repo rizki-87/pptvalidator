@@ -12,6 +12,8 @@ tqdm==4.67.1
 transformers==4.46.3
 pyspellchecker==0.7.1
 language-tool-python==2.7.0
+requests==2.32.3
+
 
 
 
