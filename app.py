@@ -3,50 +3,110 @@ import tempfile
 from pathlib import Path
 from pptx import Presentation
 from spellchecker import SpellChecker
-import language_tool_python
+import requests
 import csv
 import re
 import string
 
-# Function to validate grammar and spelling
-def validate_combined(input_ppt):
-    presentation = Presentation(input_ppt)
-    issues = []
+# Function to check grammar using LanguageTool API
+def check_grammar_with_api(text):
+    if not text.strip():
+        return "No issues", text  # Return "No issues" for empty text
+    try:
+        url = "https://api.languagetoolplus.com/v2/check"  # API endpoint
+        payload = {
+            'text': text,
+            'language': 'en-US',  # Set language (can be dynamic)
+        }
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        }
+        response = requests.post(url, data=payload, headers=headers)
+        result = response.json()
 
-    spell = SpellChecker()
-    grammar_tool = language_tool_python.LanguageTool('en-US')
+        issues = []
+        corrected_text = text  # Default corrected text is the original text
+
+        for match in result.get("matches", []):
+            replacements = match.get("replacements", [])
+            if replacements:
+                # Apply first replacement suggestion
+                replacement = replacements[0]["value"]
+                start = match["offset"]
+                end = start + match["length"]
+
+                # Correct text dynamically
+                corrected_text = corrected_text[:start] + replacement + corrected_text[end:]
+
+        if corrected_text.lower() != text.lower():
+            return "Grammatical error", corrected_text
+        return "No issues", text
+    except Exception as e:
+        return f"Error: {e}", text
+
+# Function to validate grammar in a presentation
+def validate_grammar(input_ppt):
+    presentation = Presentation(input_ppt)
+    grammar_issues = []
 
     for slide_index, slide in enumerate(presentation.slides, start=1):
         for shape in slide.shapes:
             if shape.has_text_frame:
                 for paragraph in shape.text_frame.paragraphs:
                     for run in paragraph.runs:
-                        text = run.text.strip()
-                        if text:
-                            # Check grammar with LanguageTool
-                            matches = grammar_tool.check(text)
-                            for match in matches:
-                                issues.append({
+                        if run.text.strip():
+                            issue, corrected_text = check_grammar_with_api(run.text)
+                            if issue != "No issues":
+                                grammar_issues.append({
                                     'slide': slide_index,
-                                    'issue': 'Grammar',
-                                    'text': text,
-                                    'corrected': match.replacements[0] if match.replacements else "No suggestions"
+                                    'issue': issue,
+                                    'text': run.text,
+                                    'corrected': corrected_text
                                 })
 
-                            # Check spelling with SpellChecker
-                            words = text.split()
-                            for word in words:
-                                clean_word = word.strip(string.punctuation)
-                                if clean_word.lower() not in spell:
-                                    correction = spell.correction(clean_word)
-                                    if correction:
-                                        issues.append({
-                                            'slide': slide_index,
-                                            'issue': 'Spelling',
-                                            'text': word,
-                                            'corrected': correction
-                                        })
-    return issues
+    return grammar_issues
+
+
+# Function to detect and correct misspellings
+def detect_misspellings(text):
+    spell = SpellChecker()
+    words = text.split()
+    misspellings = {}
+
+    for word in words:
+        # Remove punctuation from the word for checking
+        clean_word = word.strip(string.punctuation)
+        
+        # Check if the word is misspelled
+        if clean_word and clean_word.lower() not in spell:
+            correction = spell.correction(clean_word)
+            if correction:  # Only suggest if there's a valid correction
+                misspellings[word] = correction
+
+    return misspellings
+
+
+# Integrate into the main logic
+def validate_spelling(input_ppt):
+    presentation = Presentation(input_ppt)
+    spelling_issues = []
+
+    for slide_index, slide in enumerate(presentation.slides, start=1):
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for paragraph in shape.text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        if run.text.strip():
+                            misspellings = detect_misspellings(run.text)
+                            for original_word, correction in misspellings.items():
+                                spelling_issues.append({
+                                    'slide': slide_index,
+                                    'issue': 'Misspelling',
+                                    'text': f"Original: {original_word}",
+                                    'corrected': f"Suggestion: {correction}"
+                                })
+
+    return spelling_issues
 
 # Function to validate fonts in a presentation
 def validate_fonts(input_ppt, default_font):
@@ -137,10 +197,11 @@ def main():
             # Run validations
             font_issues = validate_fonts(temp_ppt_path, default_font)
             punctuation_issues = validate_punctuation(temp_ppt_path)
-            grammar_spelling_issues = validate_combined(temp_ppt_path)
+            spelling_issues = validate_spelling(temp_ppt_path)
+            grammar_issues = validate_grammar(temp_ppt_path)
 
             # Combine issues and save to CSV
-            combined_issues = font_issues + punctuation_issues + grammar_spelling_issues
+            combined_issues = font_issues + punctuation_issues + spelling_issues + grammar_issues
             save_to_csv(combined_issues, csv_output_path)
 
             # Display success and download link
