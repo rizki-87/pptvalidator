@@ -144,7 +144,7 @@ def password_protection():
         with st.form("password_form", clear_on_submit=True):
             password_input = st.text_input("Enter Password", type="password")
             submitted = st.form_submit_button("Submit")
-            if submitted and password_input == PREDEFINED_PASSWORD:
+            if submitted and password_input == "securepassword123":
                 st.session_state.authenticated = True
                 st.success("Access Granted! Please click 'Submit' again to proceed.")
             elif submitted:
@@ -152,7 +152,6 @@ def password_protection():
         return False
     return True
 
-# Main Function
 def main():
     if not password_protection():
         return
@@ -176,7 +175,8 @@ def main():
             start_slide, end_slide = 1, total_slides
             if validation_option == "Custom Range":
                 start_slide = st.number_input("From Slide", min_value=1, max_value=total_slides, value=1)
-                end_slide = st.number_input("To Slide", min_value=start_slide, max_value=total_slides, value=100)
+                end_slide_default = min(total_slides, 100)  # Pastikan nilai default tidak melebihi total slides
+                end_slide = st.number_input("To Slide", min_value=start_slide, max_value=total_slides, value=end_slide_default)
 
             if st.button("Run Validation"):
                 progress_bar = st.progress(0)
@@ -220,4 +220,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
