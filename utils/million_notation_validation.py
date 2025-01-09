@@ -1,18 +1,16 @@
-# utils/million_notation_validation.py
-
 import re
 import logging
 
 def validate_million_notations(slide, slide_index, notation='m', decimal_places=0):
     issues = []
     
-    # Determines the regex pattern based on the selected notation.
+    # Menentukan pola regex berdasarkan notasi yang dipilih
     if notation.lower() == 'm':
         pattern = r'\b\d+\s?m\b'
     elif notation.lower() == 'mn':
         pattern = r'\b\d+\s?Mn\b'
     else:
-        pattern = r'\b\d+\s?M\b'  
+        pattern = r'\b\d+\s?M\b'  # Default ke 'M'
 
     notation_set = set()
     all_matches = []
