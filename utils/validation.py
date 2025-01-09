@@ -1,37 +1,37 @@
-# utils/validation.py
-
-from concurrent.futures import ThreadPoolExecutor
-import tempfile
-from pathlib import Path
-from pptx import Presentation
-from pptx.dml.color import RGBColor  
-import csv
+import re
 import logging
+import string
+from utils.spelling_validation import validate_spelling_slide, validate_spelling_in_text  # Pastikan ini diimpor
 
-def highlight_ppt(input_ppt, output_ppt, issues):
-    presentation = Presentation(input_ppt)
-    for issue in issues:
-        if isinstance(issue, dict):
-            slide_index = issue['slide'] - 1
-            slide = presentation.slides[slide_index]
-            for shape in slide.shapes:
-                if shape.has_text_frame:
-                    for paragraph in shape.text_frame.paragraphs:
-                        for run in paragraph.runs:
-                            if issue['text'] in run.text:
-                                run.font.color.rgb = RGBColor(255, 255, 0)
-    presentation.save(output_ppt)
+def validate_tables(slide, slide_index):
+    issues = []
+    for shape in slide.shapes:
+        if shape.has_table:
+            table = shape.table
+            for row in table.rows:
+                for cell in row.cells:
+                    # Validasi teks di dalam sel
+                    text = cell.text.strip()
+                    if text:  # Jika ada teks
+                        issues.extend(validate_spelling_in_text(text, slide_index))
+    return issues
 
-def save_to_csv(issues, output_csv):
-    with open(output_csv, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=['slide', 'issue', 'text', 'corrected', 'details'])
-        writer.writeheader()
-        for issue in issues:
-            if isinstance(issue, dict):
-                writer.writerow({
-                    'slide': issue['slide'],
-                    'issue': issue['issue'],
-                    'text': issue['text'],
-                    'corrected': issue.get('corrected', ''),
-                    'details': issue.get('details', '')
-                })
+def validate_charts(slide, slide_index):
+    issues = []
+    for shape in slide.shapes:
+        if shape.has_chart:
+            chart = shape.chart
+            # Validasi data di dalam chart
+            for series in chart.series:
+                for point in series.points:
+                    label = point.data_label.text.strip()
+                    if label:
+                        issues.extend(validate_spelling_in_text(label, slide_index))
+            # Jika chart memiliki data yang ditampilkan dalam tabel, validasi juga
+            if chart.has_data_table:
+                for row in chart.data_table.rows:
+                    for cell in row.cells:
+                        text = cell.text.strip()
+                        if text:
+                            issues.extend(validate_spelling_in_text(text, slide_index))
+    return issues
