@@ -3,6 +3,18 @@
 PREDEFINED_PASSWORD = "securepassword123"  
   
 TECHNICAL_TERMS = {  
+    "23-Sep", "dt", "Nov", "FY20", "FY21", "eriod", "PPC", "Baorong", "22-May", "22-Dec", "23-Feb", "outturn", "11m23", "€", 
+    "NWC", "payables", "Q", "illustrative", "VDR", "Srl", "Sep23A", "cont", "SKU", "Normalised", "Jul22A", "Jul23A", 
+    "Sep22A", "Ene", "rgy", "Jun23A", "Adj", "accruals", "MBO", "FY23", "0m", "recuring", "DC", "OctA22", "adj", "EUR", "IFRS", 
+    "R", "COVID19", "Unabsorbed", "unabsorbed", "FX", "G", "EPC", "indemnities", "DD", "Accruals", "EOSB", "St", "Yorre", "adequacy", 
+    "unaudited", "LFL", "Overstock", "23-Jan", "Nov23A", "LTM", "Reclassification", "CAPEX", "BNP", "Intesa", "v", "DTA", "CIT", 
+    "quantification", "Luxco", "litigations", "PPCAI", "capex", "FY14", "PPA", "HR", "USD", "RMB", "lockdowns", "1Q21", "2Q21", "23-Jul", "btain", 
+    "FDD", "w", "r", "FY24", "FY28", "CAGR", "ackaging", "SP", "excl", "BP", "G", "overestimation", "refurbishments", "DSO", "invoicing", "DPO", "reve", 
+    "nue", "4Q23", "X", "3_Seves", "NCI", "AFS", "Ctrl", "K",
+    "m", "b", "c", "d", "vs", "Apr", "22-May", "22-Dec", "23-Feb", "Forex", "forex", "OWC",
+    "Sediver", "CoV", "quantitatively", "th", "databooks", "ngagement", "ransaction", "fr", "T", "Appendices", 
+    "LATAM", "insulators", "Sediver", "Acquiror", "Nusco", "P", "LTDA", "roposed",
+    "IfError", "s", "Sarl", "SEVES", "XYZG", "Galova", "galova", "fayet", "Fayet", "Sarl", "KMPG",
     "TensorFlow", "Caret", "ML", "DALL-E", "MLOps", "PyTorch", "MENA", "Keras", "Scikit-learn", "NumPy", "Pandas", "DALL",  
     "Matplotlib", "OpenAI", "GPT-3", "Deep Learning", "Neural Network", "Data Science", "Seaborn", "Jupyter",  
     "Anaconda", "Reinforcement Learning", "Supervised Learning", "Unsupervised Learning",  
