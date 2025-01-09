@@ -18,7 +18,7 @@ TECHNICAL_TERMS = {
     "Version Control", "API", "SDK", "Microservices", "Blockchain", "Cryptocurrency", "IoT", "Edge Computing",  
     "Quantum Computing", "Augmented Reality", "Virtual Reality", "3D Printing", "Cybersecurity",  
     "Penetration Testing", "Phishing", "Malware", "Ransomware", "Firewall", "VPN", "SSL", "Encryption",  
-    "Decryption", "Hashing", "Digital Signature", "Data Privacy", "GDPR",  
+    "Decryption", "Hashing", "Digital Signature", "Data Privacy", "GDPR", "FVDD", "UpSlide", "QRM", "PDF", "PPT", "COVID", "KPMG", "LLC", "VDD", "Ltd", "EBITDA",  
     "1M", "2M", "3M", "4M", "5M", "6M", "7M", "8M", "9M", "10M",  
     "11M", "12M", "13M", "14M", "15M", "16M", "17M", "18M", "19M", "20M",  
     "21M", "22M", "23M", "24M", "25M", "26M", "27M", "28M", "29M", "30M",  
@@ -118,7 +118,8 @@ TECHNICAL_TERMS = {
     "961M", "962M", "963M", "964M", "965M", "966M", "967M", "968M", "969M", "970M",  
     "971M", "972M", "973M", "974M", "975M", "976M", "977M", "978M", "979M", "980M",  
     "981M", "982M", "983M", "984M", "985M", "986M", "987M", "988M", "989M", "990M",  
-    "991M", "992M", "993M", "994M", "995M", "996M", "997M", "998M", "999M", "1000M", "1MN", "2MN", "3MN", "4MN", "5MN", "6MN", "7MN", "8MN", "9MN", "10MN",  
+    "991M", "992M", "993M", "994M", "995M", "996M", "997M", "998M", "999M", "1000M", 
+    "1MN", "2MN", "3MN", "4MN", "5MN", "6MN", "7MN", "8MN", "9MN", "10MN",  
     "11MN", "12MN", "13MN", "14MN", "15MN", "16MN", "17MN", "18MN", "19MN", "20MN",  
     "21MN", "22MN", "23MN", "24MN", "25MN", "26MN", "27MN", "28MN", "29MN", "30MN",  
     "31MN", "32MN", "33MN", "34MN", "35MN", "36MN", "37MN", "38MN", "39MN", "40MN",  
@@ -217,8 +218,7 @@ TECHNICAL_TERMS = {
     "961MN", "962MN", "963MN", "964MN", "965MN", "966MN", "967MN", "968MN", "969MN", "970MN",  
     "971MN", "972MN", "973MN", "974MN", "975MN", "976MN", "977MN", "978MN", "979MN", "980MN",  
     "981MN", "982MN", "983MN", "984MN", "985MN", "986MN", "987MN", "988MN", "989MN", "990MN",  
-    "991MN", "992MN", "993MN", "994MN", "995MN", "996MN", "997MN", "998MN", "999MN", "1000MN",  
-    "FVDD", "UpSlide", "QRM", "PDF", "PPT", "COVID", "KPMG", "LLC", "VDD", "Ltd", "EBITDA"  
+    "991MN", "992MN", "993MN", "994MN", "995MN", "996MN", "997MN", "998MN", "999MN", "1000MN"
 }  
   
 NUMERIC_TERMS = {f"{i}+" for i in range(1, 101)}  
