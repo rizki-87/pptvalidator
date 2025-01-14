@@ -1,5 +1,3 @@
-# utils/decimal_validation.py
-
 import re
 import logging
 
