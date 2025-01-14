@@ -1,8 +1,10 @@
-# utils/highlight.py
-
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 import csv
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def highlight_ppt(input_ppt, output_ppt, issues):
     """
@@ -22,7 +24,7 @@ def highlight_ppt(input_ppt, output_ppt, issues):
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs:
                         for run in paragraph.runs:
-                            if issue['text'] in run.text:
+                            if issue.get('text', '') in run.text:  # Gunakan .get() untuk menghindari KeyError
                                 run.font.color.rgb = RGBColor(255, 255, 0)  # Highlight in yellow
 
     # Save the highlighted presentation
@@ -41,10 +43,12 @@ def save_to_csv(issues, output_csv):
         writer.writeheader()
         for issue in issues:
             if isinstance(issue, dict):
+                # Tambahkan logging untuk memeriksa isi issue
+                logging.debug(f"Issue: {issue}")  # Log isi dari issue
                 writer.writerow({
-                    'slide': issue['slide'],
-                    'issue': issue['issue'],
-                    'text': issue['text'],
+                    'slide': issue.get('slide', ''),  # Gunakan .get() untuk menghindari KeyError
+                    'issue': issue.get('issue', ''),
+                    'text': issue.get('text', 'N/A'),  # Ganti dengan 'N/A' jika tidak ada
                     'corrected': issue.get('corrected', ''),
                     'details': issue.get('details', '')
                 })
